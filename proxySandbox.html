@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  
+</body>
+<script>
+  class ProxySandbox {
+    active() {
+      this.sandboxRunning = true;
+    }
+    inactive() {
+      this.sandboxRunning = false;
+    }
+    constructor() {
+      const rawWindow = window;
+      const fakeWindow = {};
+      const proxy = new Proxy(fakeWindow, {
+        set: (target, prop, value) => {
+          if(this.sandboxRunning) {
+            target[prop] = value;
+            return true;
+          }
+        },
+        get: (target, prop) => {
+          // 如果fakeWindow里面有，就从fakeWindow里面取，否则，就从外部的window里面取
+          let value = prop in target ? target[prop] : rawWindow[prop];
+          return value
+        }
+      })
+      this.proxy = proxy;
+    }
+  }
+  window.sex = '男';
+  let proxy1 = new ProxySandbox();
+  let proxy2 = new ProxySandbox();
+  ((window) => {
+    proxy1.active();
+    console.log('修改前proxy1的sex', window.sex);
+    window.sex = '女';
+    console.log('修改后proxy1的sex', window.sex);
+  })(proxy1.proxy);
+  console.log('外部window.sex=>1', window.sex);
+
+  ((window) => {
+    proxy2.active();
+    console.log('修改前proxy2的sex', window.sex);
+    window.sex = '111';
+    console.log('修改后proxy2的sex', window.sex);
+  })(proxy2.proxy);
+  console.log('外部window.sex=>2', window.sex);
+
+</script>
+</html>

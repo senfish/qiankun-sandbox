@@ -1,2 +1,2 @@
 # qiankun-sandbox
-实现一个js的沙箱环境
+qiankun js沙箱隔离的三种简化demo

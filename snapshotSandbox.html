@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  
+</body>
+<script>
+  /*
+  基于diff来实现的沙箱，用于不支持window.Proxy低版本浏览器， 快照沙箱
+  */
+const iter = (window, callback) => {
+  for (const prop in window) {
+    if(window.hasOwnProperty(prop)) {
+      callback(prop);
+    }
+  }
+}
+class SnapshotSandbox {
+  constructor() {
+    this.proxy = window;
+    this.modifyPropsMap = {};
+  }
+  active() {
+    // 缓存active状态的window
+    this.windowSnapshot = {};
+    iter(window, (prop) => {
+      this.windowSnapshot[prop] = window[prop];
+    });
+    Object.keys(this.modifyPropsMap).forEach(p => {
+      window[p] = this.modifyPropsMap[p];
+    })
+  }
+  inactive(){
+    iter(window, (prop) => {
+      if(this.windowSnapshot[prop] !== window[prop]) {
+        // 记录变更
+        this.modifyPropsMap[prop] = window[prop];
+        // 还原window
+        window[prop] = this.windowSnapshot[prop];
+      }
+    })
+  }
+}
+// 进来的时候，记录一下当前window的属性
+// 退出的时候，记录修改，并且把window还原到进入的时候
+// 下次进入的时候，把修改属性放到window上
+const sandbox = new SnapshotSandbox();
+((window) => {
+   // 激活沙箱
+   sandbox.active();
+   window.sex= '男';
+   window.age = '22';
+   console.log(window.sex, window.age);
+   // 失活沙箱
+   sandbox.inactive();
+   console.log(window.sex, window.age);
+   // 激活沙箱
+   sandbox.active();
+   console.log(window.sex, window.age);
+})(sandbox.proxy);
+
+</script>
+</html>

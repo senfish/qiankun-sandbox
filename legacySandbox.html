@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  
+</body>
+<script>
+class Legacy {
+  constructor() {
+    // 沙箱期间新增的全局变量
+    this.addedPropsMapInSandbox = {};
+    // 沙箱期间更新的全局变量
+    this.modifiedPropsOriginalValueMapInSandbox = {};
+    // 持续记录更新的(新增和修改的)全局变量的 map，用于在任意时刻做 snapshot
+    this.currentUpdatedPropsValueMap = {};
+    const rawWindow = window;
+    const fakeWindow = Object.create(null);
+    this.sandboxRunning = true;
+    const proxy = new Proxy(fakeWindow, {
+      set: (target, prop, value) => {
+        // 如果是激活状态
+        if(this.sandboxRunning) {
+          // 判断当前window上存不存在该属性
+          if(!rawWindow.hasOwnProperty(prop)) {
+            // 记录新增值
+            this.addedPropsMapInSandbox[prop] = value;
+          } else if(!this.modifiedPropsOriginalValueMapInSandbox[prop]) {
+            // 记录更新值的初始值
+            const originValue = rawWindow[prop]
+            this.modifiedPropsOriginalValueMapInSandbox[prop] = originValue;
+          }
+          // 纪录此次修改的属性
+          this.currentUpdatedPropsValueMap[prop] = value;
+          // 将设置的属性和值赋给了当前window，还是污染了全局window变量
+          rawWindow[prop] = value;
+          return true;
+        }
+        return true;
+      },
+      get: (target, prop) => {
+        return rawWindow[prop];
+      }
+    })
+    this.proxy = proxy;
+  }
+  active() {
+    if (!this.sandboxRunning) {
+      // 还原上次修改的值
+      for(const key in this.currentUpdatedPropsValueMap) {
+        window[key] = this.currentUpdatedPropsValueMap[key];
+      }
+    }
+
+    this.sandboxRunning = true;
+  }
+  inactive() {
+    // 将更新值的初始值还原给window
+    for(const key in this.modifiedPropsOriginalValueMapInSandbox) {
+      window[key] = this.modifiedPropsOriginalValueMapInSandbox[key];
+    }
+    // 将新增的值删掉
+    for(const key in this.addedPropsMapInSandbox) {
+      delete window[key];
+    }
+
+    this.sandboxRunning = false;
+  }
+}
+  // /**
+  //  * 原理: 
+  //  * set: 每次赋值的时候，判断是不是激活状态，然后在判断window里面有没有
+  //  * 如果没有的话，认为你是新增的数据，添加到addedPropsMapInSandbox里面
+  //  * 如果有的话，再去modifiedPropsOriginalValueMapInSandbox判断有没有
+  //  *    如果modifiedPropsOriginalValueMapInSandbox也没有的话，就往这里面添一个。
+  //  * 最后修改的存到currentUpdatedPropsValueMap里面，然后把当前的值赋给window属性上
+  //  * 
+  //  * get: 直接从window里面取值
+  //  * /
+  window.sex= '男';
+  let LegacySandbox = new Legacy();
+  ((window) => {
+   // 激活沙箱
+   LegacySandbox.active();
+   window.age = '22';
+   window.sex= '女';
+   console.log('激活', window.sex, window.age, LegacySandbox);
+   // 失活沙箱
+   LegacySandbox.inactive();
+   console.log('退出', window.sex, window.age, LegacySandbox);
+   // 激活沙箱
+   LegacySandbox.active();
+   console.log('再次激活', window.sex, window.age, LegacySandbox);
+  })(LegacySandbox.proxy);
+  console.log('退出沙箱proxy1', window.sex);
+
+</script>
+</html>
